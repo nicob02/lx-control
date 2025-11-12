@@ -34,18 +34,30 @@ class PIDController():
             v:          linear velocity of the Duckiebot
             omega:      angular velocity of the Duckiebot
         """
+        
+         # 1) Heading error (wrap to [-pi, pi] so we turn the shortest way)
+        e = theta_ref - theta_curr
+        e = (e + np.pi) % (2.0 * np.pi) - np.pi
 
-        # TODO: implement a PID controller to track the reference heading
-        # feel free to make use of the global variables:
-        # self.kp, self.ki, and self. kd, which are
-        # set either by the notebook or from noVNC
-        # as well as self_prev_int_heading to track the integral term
-        # self.prev_e_heading the previous error. But note that you
-        # should be the one to update them also.
+        # Guard tiny/zero dt for numerical stability
+        dt = max(delta_t, 1e-6)
 
+        # 2) Integral term: accumulate error over time
+        self.prev_int_heading += e * dt
+
+        # 3) Derivative term: rate of change of error (backward difference)
+        de_dt = (e - self.prev_e_heading) / dt
+
+        # 4) PID combination -> angular velocity command
+        omega = self.kp * e + self.ki * self.prev_int_heading + self.kd * de_dt
+
+        # 5) Update memory for next call
+        self.prev_e_heading = e
+
+        # Linear velocity is passed through from UI
         v = v_ref
-        omega = np.random.uniform(-8.0, 8.0)
         return v, omega
+
 
     def OffsetControl(self,
                       v_ref: float,
@@ -64,16 +76,25 @@ class PIDController():
             v:          linear velocity of the Duckiebot
             omega:      angular velocity of the Duckiebot
         """
+        
+        # 1) Error: how far we are from desired lateral position
+        e = y_ref - y_curr
 
-        # TODO: implement a PID controller to track the reference lateral offset
-        # feel free to make use of the global variables:
-        # self.kp, self.ki, and self. kd, which are
-        # set either by the notebook or from noVNC
-        # as well as self_prev_int_offset to track the integral term
-        # self.prev_e_offset the previous error. But note that you
-        # should be the one to update them also.
+        # 2) Guard tiny dt for numerical stability
+        dt = max(delta_t, 1e-6)
 
-        omega = np.random.uniform(-8.0, 8.0)
+        # 3) Integral: accumulate error over time
+        self.prev_int_offset += e * dt
+
+        # 4) Derivative: how fast the error is changing
+        de_dt = (e - self.prev_e_offset) / dt
+
+        # 5) PID: turn rate to reduce lateral error
+        omega = self.kp * e + self.ki * self.prev_int_offset + self.kd * de_dt
+
+        # 6) Bookkeeping for next call
+        self.prev_e_offset = e
+
         v = v_ref
         return v, omega
 
